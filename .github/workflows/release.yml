@@ -67,3 +67,103 @@ jobs:
             unicli-osx-arm64.tar.gz \
             unicli-osx-x64.tar.gz \
             unicli-win-x64.zip
+
+      - name: Update Scoop manifest
+        env:
+          GH_TOKEN: ${{ secrets.UNICLI_RELEASE_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          SHA256=$(sha256sum unicli-win-x64.zip | awk '{print $1}')
+
+          cat > /tmp/unicli.json <<EOF
+          {
+            "version": "${VERSION}",
+            "description": "A command-line interface for controlling Unity Editor from the terminal",
+            "homepage": "https://github.com/yucchiy/UniCli",
+            "license": "MIT",
+            "architecture": {
+              "64bit": {
+                "url": "https://github.com/yucchiy/UniCli/releases/download/v${VERSION}/unicli-win-x64.zip",
+                "hash": "${SHA256}"
+              }
+            },
+            "bin": "unicli.exe",
+            "checkver": {
+              "github": "https://github.com/yucchiy/UniCli"
+            },
+            "autoupdate": {
+              "architecture": {
+                "64bit": {
+                  "url": "https://github.com/yucchiy/UniCli/releases/download/v\$version/unicli-win-x64.zip"
+                }
+              }
+            }
+          }
+          EOF
+
+          CONTENT=$(base64 -w 0 /tmp/unicli.json)
+          SHA=$(gh api repos/yucchiy/scoop-bucket/contents/bucket/unicli.json --jq '.sha' 2>/dev/null || echo "")
+
+          if [ -n "$SHA" ]; then
+            gh api repos/yucchiy/scoop-bucket/contents/bucket/unicli.json \
+              --method PUT \
+              --field message="Update unicli to v${VERSION}" \
+              --field content="$CONTENT" \
+              --field sha="$SHA"
+          else
+            gh api repos/yucchiy/scoop-bucket/contents/bucket/unicli.json \
+              --method PUT \
+              --field message="Add unicli v${VERSION}" \
+              --field content="$CONTENT"
+          fi
+
+      - name: Update Homebrew formula
+        env:
+          GH_TOKEN: ${{ secrets.UNICLI_RELEASE_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          SHA256_ARM64=$(sha256sum unicli-osx-arm64.tar.gz | awk '{print $1}')
+          SHA256_X64=$(sha256sum unicli-osx-x64.tar.gz | awk '{print $1}')
+
+          cat > /tmp/unicli.rb <<FORMULA
+          class Unicli < Formula
+            desc "CLI tool to control Unity Editor from the terminal"
+            homepage "https://github.com/yucchiy/UniCli"
+            version "${VERSION}"
+            license "MIT"
+
+            on_macos do
+              if Hardware::CPU.arm?
+                url "https://github.com/yucchiy/UniCli/releases/download/v#{version}/unicli-osx-arm64.tar.gz"
+                sha256 "${SHA256_ARM64}"
+              else
+                url "https://github.com/yucchiy/UniCli/releases/download/v#{version}/unicli-osx-x64.tar.gz"
+                sha256 "${SHA256_X64}"
+              end
+            end
+
+            def install
+              bin.install "unicli"
+            end
+
+            test do
+              assert_match version.to_s, shell_output("#{bin}/unicli --version")
+            end
+          end
+          FORMULA
+
+          CONTENT=$(base64 -w 0 /tmp/unicli.rb)
+          SHA=$(gh api repos/yucchiy/homebrew-tap/contents/Formula/unicli.rb --jq '.sha' 2>/dev/null || echo "")
+
+          if [ -n "$SHA" ]; then
+            gh api repos/yucchiy/homebrew-tap/contents/Formula/unicli.rb \
+              --method PUT \
+              --field message="Update unicli to v${VERSION}" \
+              --field content="$CONTENT" \
+              --field sha="$SHA"
+          else
+            gh api repos/yucchiy/homebrew-tap/contents/Formula/unicli.rb \
+              --method PUT \
+              --field message="Add unicli v${VERSION}" \
+              --field content="$CONTENT"
+          fi

@@ -296,6 +296,7 @@ When creating new commands, follow the naming conventions in `doc/command-naming
 4. Create a PR to `main` with a changelog summary
 5. After merge: `git tag vX.Y.Z && git push origin vX.Y.Z`
    - GitHub Actions (`.github/workflows/release.yml`) will automatically build binaries and create a GitHub Release
+   - The Homebrew formula (`yucchiy/homebrew-tap`) and Scoop manifest (`yucchiy/scoop-bucket`) are automatically updated by CI (using the `UNICLI_RELEASE_TOKEN` secret)
 
 ### Tests requiring Unity connection
 

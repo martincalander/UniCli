@@ -44,6 +44,13 @@ brew tap yucchiy/tap
 brew install unicli
 ```
 
+**Scoop (Windows):**
+
+```powershell
+scoop bucket add unicli https://github.com/yucchiy/scoop-bucket
+scoop install unicli
+```
+
 **Manual:** Download the latest binary from the [Releases](https://github.com/yucchiy/UniCli/releases) page and place it in your PATH.
 
 ### Unity Package
