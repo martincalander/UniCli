@@ -1,8 +1,8 @@
 {
   "name": "com.yucchiy.unicli-server",
-  "version": "0.14.0",
+  "version": "1.0.0",
   "displayName": "UniCli Server",
-  "description": "Unity Editor拡張機能 - CLIからUnityを操作するためのサーバー",
+  "description": "Unity Editor plugin - Server for controlling Unity via CLI",
   "unity": "2022.3",
   "author": {
     "name": "Yuichiro Mukai",
