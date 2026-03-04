@@ -277,8 +277,6 @@ unicli eval 'await Task.Delay(5000, cancellationToken); return "done";' --json
 
 You can extend UniCli by adding custom commands in your Unity project. Commands are auto-discovered — no manual registration required.
 
-### Class-based commands
-
 Inherit from `CommandHandler<TRequest, TResponse>` and define `[Serializable]` request/response types:
 
 ```csharp
