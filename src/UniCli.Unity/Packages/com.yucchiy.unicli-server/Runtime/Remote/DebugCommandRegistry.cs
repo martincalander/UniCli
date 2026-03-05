@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using UnityEngine;
 using UnityEngine.Scripting;
 
 namespace UniCli.Remote
@@ -40,19 +39,14 @@ namespace UniCli.Remote
                     {
                         var instance = (DebugCommand)Activator.CreateInstance(type);
                         if (!_commands.TryAdd(instance.CommandName, instance))
-                        {
-                            UnityEngine.Debug.LogWarning($"[UniCli.Remote] Duplicate debug command '{instance.CommandName}', skipping {type.FullName}");
                             continue;
-                        }
                     }
-                    catch (Exception ex)
+                    catch
                     {
-                        UnityEngine.Debug.LogWarning($"[UniCli.Remote] Failed to create debug command ({type.FullName}): {ex.Message}");
+                        // Silently skip commands that fail to instantiate.
                     }
                 }
             }
-
-            UnityEngine.Debug.Log($"[UniCli.Remote] Discovered {_commands.Count} debug command(s)");
         }
 
         public bool TryGetCommand(string name, out DebugCommand command)

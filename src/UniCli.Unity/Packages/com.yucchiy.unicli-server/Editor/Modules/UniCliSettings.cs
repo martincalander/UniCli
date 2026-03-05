@@ -8,11 +8,12 @@ namespace UniCli.Server.Editor
 {
     public class UniCliSettings
     {
-        const string ConfigKey = "UniCli.disabledModules";
+        internal const string DisabledModulesConfigKey = "UniCli.disabledModules";
+        internal const string EditorLoggingEnabledConfigKey = "UniCli.editor.logging.enabled";
 
         HashSet<string> LoadDisabledModules()
         {
-            var raw = EditorUserSettings.GetConfigValue(ConfigKey);
+            var raw = EditorUserSettings.GetConfigValue(DisabledModulesConfigKey);
             return string.IsNullOrEmpty(raw)
                 ? new HashSet<string>()
                 : new HashSet<string>(raw.Split(',', StringSplitOptions.RemoveEmptyEntries));
@@ -21,7 +22,44 @@ namespace UniCli.Server.Editor
         void SaveDisabledModules(HashSet<string> modules)
         {
             var value = modules.Count > 0 ? string.Join(",", modules) : "";
-            EditorUserSettings.SetConfigValue(ConfigKey, value);
+            EditorUserSettings.SetConfigValue(DisabledModulesConfigKey, value);
+        }
+
+        public bool IsEditorLoggingEnabled()
+        {
+            return ReadEditorLoggingEnabled();
+        }
+
+        public void SetEditorLoggingEnabled(bool enabled)
+        {
+            var value = enabled ? "1" : "0";
+            EditorUserSettings.SetConfigValue(EditorLoggingEnabledConfigKey, value);
+
+            ApplyEditorLoggingEnabled(enabled);
+        }
+
+        internal static bool ReadEditorLoggingEnabled()
+        {
+            var raw = EditorUserSettings.GetConfigValue(EditorLoggingEnabledConfigKey);
+            return ParseEnabledFlag(raw, defaultValue: true);
+        }
+
+        internal static void ApplyEditorLoggingEnabled(bool enabled)
+        {
+            UniCliEditorLog.EnableLogs = enabled;
+        }
+
+        internal static bool ParseEnabledFlag(string raw, bool defaultValue)
+        {
+            if (string.IsNullOrEmpty(raw))
+                return defaultValue;
+
+            return raw switch
+            {
+                "1" => true,
+                "0" => false,
+                _ => bool.TryParse(raw, out var enabled) ? enabled : defaultValue
+            };
         }
 
         public bool IsModuleEnabled(string name)
