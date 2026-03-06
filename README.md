@@ -184,7 +184,7 @@ These options can be combined with any `exec` command:
 | `--json`    | Output in JSON format                |
 | `--timeout` | Set command timeout in milliseconds  |
 | `--no-focus`| Don't bring Unity Editor to front    |
-| `--help`    | Show command parameters and usage    |
+| `--help`    | Show command parameters and nested type details |
 
 By default, when the server is not responding (e.g., after an assembly reload), the CLI automatically brings Unity Editor to the foreground using a PID file (`Library/UniCli/server.pid`) and restores focus to the original application once the command completes. Use `--no-focus` to disable this behavior, or set the `UNICLI_FOCUS` environment variable to `0` or `false` to disable it globally.
 
@@ -226,6 +226,19 @@ unicli exec Console.GetLog --logType "Warning,Error"
 
 # Show command parameters and usage
 unicli exec GameObject.Find --help
+```
+
+### Inspect nested request/response types
+
+`unicli exec <command> --help` shows top-level fields and, when available, nested type details.
+For machine-readable schemas, use `unicli commands --json`: each field includes a `children` array.
+
+```bash
+# Human-friendly schema (includes nested type details)
+unicli exec AssetDatabase.Find --help
+
+# Machine-readable schema (fields include "children")
+unicli commands --json
 ```
 
 See [Built-in Commands](#built-in-commands) for the full list of available commands.

@@ -26,7 +26,7 @@ The CLI (`unicli`) communicates with the Unity Editor over named pipes, so the E
 5. **For platform-specific verification**: Use `unicli exec BuildPlayer.Compile --target <platform> --json` to catch platform-specific errors (missing `#if` guards, unsupported APIs, etc.).
 6. **When running tests**: Always use the default `--resultFilter failures` (or `--resultFilter none` for summary-only) to keep output minimal. Only use `--resultFilter all` when you specifically need to inspect individual passed test details. This prevents large test suites from flooding context. Stack traces are omitted by default (`--stackTraceLines 0`); use `--stackTraceLines 3` when you need to diagnose a failure location.
 7. **When checking console logs**: Use `--logType "Warning,Error"` to filter out informational noise and focus on actionable issues. Stack traces are omitted by default; use `--stackTraceLines 3` when debugging errors.
-8. **Discover commands dynamically**: Use `unicli commands --json` to list all available commands and `unicli exec <command> --help` to see parameters for any command. Do not rely on memorized command lists — the project may have custom commands.
+8. **Discover commands dynamically**: Use `unicli commands --json` to list all available commands and `unicli exec <command> --help` to see parameters for any command. `--help` includes nested type details when applicable, and `commands --json` provides nested schemas via each field's `children`. Do not rely on memorized command lists — the project may have custom commands.
 
 ## Project Path
 
@@ -91,7 +91,7 @@ unicli exec BuildPlayer.Build --locationPathName "Builds/Test.app" --options Dev
 - `--json` — Output in JSON format (recommended for structured processing)
 - `--timeout <ms>` — Set command timeout in milliseconds
 - `--no-focus` — Don't bring Unity Editor to front
-- `--help` — Show command parameters and usage
+- `--help` — Show command parameters and nested type details
 
 ## Key Workflows
 
@@ -227,5 +227,6 @@ Key rules:
 ## Tips
 
 - Run `unicli commands --json` to discover all available commands, including project-specific custom commands.
-- Run `unicli exec <command> --help` to see parameters, types, and default values for any command.
+- Run `unicli exec <command> --help` to see parameters, types, defaults, and nested type details for any command.
+- Run `unicli commands --json` to get machine-readable schemas; nested fields are represented by each field's `children`.
 - If a command times out, increase the timeout: `unicli exec Compile --timeout 60000`.
