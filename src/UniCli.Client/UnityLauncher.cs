@@ -1,7 +1,6 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Runtime.InteropServices;
 using UniCli.Protocol;
 
 namespace UniCli.Client;
@@ -49,17 +48,25 @@ internal static class UnityLauncher
         }
 
         var normalizedRoot = NormalizeProjectRoot(projectRoot);
+        var startInfo = CreateStartInfo(editorPath, normalizedRoot, OperatingSystem.IsMacOS());
 
-        Process.Start(new ProcessStartInfo
-        {
-            FileName = editorPath,
-            Arguments = $"-projectPath \"{normalizedRoot}\"",
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-        });
+        using var process = Process.Start(startInfo);
+        if (process == null)
+            return Result<bool, string>.Error("Failed to start Unity Editor process.");
 
         return Result<bool, string>.Success(true);
+    }
+
+    internal static ProcessStartInfo CreateStartInfo(string editorPath, string projectRoot, bool isMacOS)
+    {
+        if (isMacOS)
+        {
+            var appBundlePath = TryGetMacOSAppBundlePath(editorPath);
+            if (appBundlePath != null)
+                return CreateMacOSOpenStartInfo(appBundlePath, projectRoot);
+        }
+
+        return CreateDirectStartInfo(editorPath, projectRoot);
     }
 
     internal static string? ReadEditorVersion(string projectRoot)
@@ -92,11 +99,57 @@ internal static class UnityLauncher
         return null;
     }
 
-    private static string NormalizeProjectRoot(string projectRoot)
+    internal static string? TryGetMacOSAppBundlePath(string editorPath)
+    {
+        var macOsDirectory = Path.GetDirectoryName(editorPath);
+        var contentsDirectory = macOsDirectory != null
+            ? Path.GetDirectoryName(macOsDirectory)
+            : null;
+        var appBundlePath = contentsDirectory != null
+            ? Path.GetDirectoryName(contentsDirectory)
+            : null;
+
+        if (string.IsNullOrEmpty(appBundlePath))
+            return null;
+
+        return string.Equals(Path.GetExtension(appBundlePath), ".app", StringComparison.OrdinalIgnoreCase)
+            ? appBundlePath
+            : null;
+    }
+
+    internal static string NormalizeProjectRoot(string projectRoot)
     {
         var trimmed = projectRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        if (Path.GetFileName(trimmed) == "Assets")
-            return Path.GetDirectoryName(trimmed) ?? trimmed;
-        return trimmed;
+        var normalized = Path.GetFileName(trimmed) == "Assets"
+            ? Path.GetDirectoryName(trimmed) ?? trimmed
+            : trimmed;
+        return Path.GetFullPath(normalized);
+    }
+
+    private static ProcessStartInfo CreateMacOSOpenStartInfo(string appBundlePath, string projectRoot)
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "open",
+            UseShellExecute = false,
+        };
+        startInfo.ArgumentList.Add("-a");
+        startInfo.ArgumentList.Add(appBundlePath);
+        startInfo.ArgumentList.Add("--args");
+        startInfo.ArgumentList.Add("-projectPath");
+        startInfo.ArgumentList.Add(projectRoot);
+        return startInfo;
+    }
+
+    private static ProcessStartInfo CreateDirectStartInfo(string editorPath, string projectRoot)
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = editorPath,
+            UseShellExecute = true,
+        };
+        startInfo.ArgumentList.Add("-projectPath");
+        startInfo.ArgumentList.Add(projectRoot);
+        return startInfo;
     }
 }

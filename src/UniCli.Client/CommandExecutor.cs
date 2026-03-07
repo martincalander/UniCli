@@ -11,7 +11,6 @@ namespace UniCli.Client;
 internal static class CommandExecutor
 {
     private const int DefaultMaxRetries = 5;
-    private const int LaunchMaxRetries = 30;
     private const int RetryDelayMs = 1000;
 
     public static async Task<Result<CommandResponse, string>> SendAsync(
@@ -38,8 +37,6 @@ internal static class CommandExecutor
 
         string lastError = "";
         long focusSavedState = 0;
-        var launchAttempted = false;
-
         for (var attempt = 1; attempt <= maxRetries; attempt++)
         {
             using var client = new PipeClient(pipeName);
@@ -49,9 +46,8 @@ internal static class CommandExecutor
             {
                 lastError = connectResult.ErrorValue;
 
-                if (!launchAttempted && !UnityProcessActivator.IsUnityRunning(unityProjectRoot))
+                if (!UnityProcessActivator.IsUnityRunning(unityProjectRoot))
                 {
-                    launchAttempted = true;
                     Console.Error.WriteLine("Unity is not running, launching...");
                     var launchResult = UnityLauncher.Launch(unityProjectRoot);
                     if (launchResult.IsError)
@@ -61,7 +57,9 @@ internal static class CommandExecutor
                             $"Failed to launch Unity Editor: {launchResult.ErrorValue}");
                     }
 
-                    maxRetries = LaunchMaxRetries;
+                    await RestoreFocusAsync(focusSavedState);
+                    return Result<CommandResponse, string>.Error(
+                        BuildLaunchStartedMessage(unityProjectRoot));
                 }
 
                 focusSavedState = await TryFocusOnceAsync(
@@ -113,6 +111,14 @@ internal static class CommandExecutor
     }
 
     private static bool IsRetryableError(string error) => ArgumentParser.IsRetryableError(error);
+
+    internal static string BuildLaunchStartedMessage(string projectRoot)
+    {
+        var normalizedProjectRoot = UnityLauncher.NormalizeProjectRoot(projectRoot);
+        return "Unity Editor was not running, so UniCli started it.\n"
+            + $"  Project: {normalizedProjectRoot}\n"
+            + "  Wait for Unity Editor to finish loading, then run the command again.";
+    }
 
     private static async Task<long> TryFocusOnceAsync(
         bool focusEditor, long savedState, string projectRoot)
