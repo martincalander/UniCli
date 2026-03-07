@@ -4,9 +4,7 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using UniCli.Protocol;
 using UniCli.Server.Editor.Handlers;
-using UniCli.Server.Editor.Internal;
 using UnityEditor;
-using UnityEngine;
 
 namespace UniCli.Server.Editor.Tests
 {
@@ -128,6 +126,76 @@ namespace UniCli.Server.Editor.Tests
             var response = dispatcher.BuildResponse(true, "ok", data, handler, true);
             Assert.AreEqual("json", response.format);
             StringAssert.Contains("fallback", response.data);
+        }
+
+        [Test]
+        public void BuildResponse_CommandListResponse_WithDeepChildren_SerializesFullDepth()
+        {
+            var dispatcher = new CommandDispatcher(CreateServiceRegistry());
+            var handler = new StubHandler();
+            var data = new CommandListResponse
+            {
+                commands = new[]
+                {
+                    new CommandInfo
+                    {
+                        name = "Test.Command",
+                        description = "Command metadata",
+                        builtIn = true,
+                        module = "",
+                        requestFields = new[] { CreateFieldChain(12) },
+                        responseFields = Array.Empty<CommandFieldInfo>()
+                    }
+                }
+            };
+
+            var response = dispatcher.BuildResponse(true, "ok", data, handler, false);
+
+            Assert.AreEqual("json", response.format);
+
+            for (var i = 0; i < 12; i++)
+            {
+                StringAssert.Contains($"\"name\":\"level{i}\"", response.data);
+            }
+
+            StringAssert.Contains(
+                "\"name\":\"level10\",\"type\":\"Level10\",\"defaultValue\":\"\",\"children\":[{\"name\":\"level11\",\"type\":\"Level11\",\"defaultValue\":\"\",\"children\":[]}]",
+                response.data);
+            Assert.AreEqual(12, CountOccurrences(response.data, "\"children\":"));
+        }
+
+        private static CommandFieldInfo CreateFieldChain(int depth)
+        {
+            CommandFieldInfo current = null;
+
+            for (var i = depth - 1; i >= 0; i--)
+            {
+                current = new CommandFieldInfo
+                {
+                    name = $"level{i}",
+                    type = $"Level{i}",
+                    defaultValue = "",
+                    children = current == null
+                        ? Array.Empty<CommandFieldInfo>()
+                        : new[] { current }
+                };
+            }
+
+            return current;
+        }
+
+        private static int CountOccurrences(string text, string value)
+        {
+            var count = 0;
+            var startIndex = 0;
+
+            while ((startIndex = text.IndexOf(value, startIndex, StringComparison.Ordinal)) >= 0)
+            {
+                count++;
+                startIndex += value.Length;
+            }
+
+            return count;
         }
     }
 }
