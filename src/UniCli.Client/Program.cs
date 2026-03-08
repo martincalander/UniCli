@@ -13,11 +13,8 @@ internal sealed class Program
 {
     static async Task Main(string[] args)
     {
-        if (args.Length >= 2 && args[0] == "exec")
+        if (args is ["exec", var commandName, .. var remaining])
         {
-            var commandName = args[1];
-            var remaining = args.Skip(2).ToArray();
-
             if (remaining.Contains("--help"))
             {
                 Environment.ExitCode = await CommandExecutor.PrintCommandHelpAsync(commandName);
@@ -46,9 +43,9 @@ internal sealed class Program
             return;
         }
 
-        if (args.Length >= 1 && args[0] == "eval")
+        if (args is ["eval", .. var evalArgs])
         {
-            Environment.ExitCode = await RunEvalAsync(args.Skip(1).ToArray());
+            Environment.ExitCode = await RunEvalAsync(evalArgs);
             return;
         }
 
@@ -124,7 +121,7 @@ internal sealed class Program
 
     private static string ExtractValue(ref string[] args, string flag)
     {
-        string value = null;
+        string? value = null;
         var remaining = new List<string>();
 
         for (var i = 0; i < args.Length; i++)
@@ -141,6 +138,6 @@ internal sealed class Program
         }
 
         args = remaining.ToArray();
-        return value;
+        return value!;
     }
 }
