@@ -13,10 +13,14 @@ public partial class Commands
     /// List all available commands from the Unity Editor server
     /// </summary>
     [Command("commands")]
-    public async Task<int> ListCommands(bool json = false, bool noFocus = false)
+    public async Task<int> ListCommands(
+        bool json = false,
+        bool noFocus = false,
+        bool headless = false,
+        bool noGraphics = false)
     {
-        var focus = UnityProcessActivator.ShouldFocus(noFocus);
-        var sendResult = await CommandExecutor.SendAsync("Commands.List", "", focusEditor: focus);
+        var launchOptions = UnityLaunchOptions.Resolve(headless, noGraphics, noFocus);
+        var sendResult = await CommandExecutor.SendAsync("Commands.List", "", launchOptions: launchOptions);
 
         var cliResult = sendResult.Match(
             onSuccess: response =>

@@ -5,6 +5,7 @@ using UnityEditor;
 
 namespace UniCli.Server.Editor.Handlers
 {
+    [CommandCapability(interactiveOnly: true)]
     public sealed class SetGameObjectSelectionHandler : CommandHandler<SetGameObjectSelectionRequest, SetGameObjectSelectionResponse>
     {
         public override string CommandName => "Selection.SetGameObject";

@@ -13,10 +13,12 @@ public partial class Commands
         [Argument] string data = "",
         int timeout = 0,
         bool json = false,
-        bool noFocus = false)
+        bool noFocus = false,
+        bool headless = false,
+        bool noGraphics = false)
     {
-        var focus = UnityProcessActivator.ShouldFocus(noFocus);
-        var result = await CommandExecutor.ExecuteAsync(command, data, timeout, json, focusEditor: focus);
+        var launchOptions = UnityLaunchOptions.Resolve(headless, noGraphics, noFocus);
+        var result = await CommandExecutor.ExecuteAsync(command, data, timeout, json, launchOptions);
         return OutputWriter.Write(result, json);
     }
 }

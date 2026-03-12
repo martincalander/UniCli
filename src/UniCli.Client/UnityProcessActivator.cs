@@ -16,8 +16,11 @@ internal static class UnityProcessActivator
         return new NullProcessActivator();
     }
 
-    public static bool ShouldFocus(bool noFocusFlag)
+    public static bool ShouldFocus(bool noFocusFlag, UnityLaunchMode mode)
     {
+        if (mode == UnityLaunchMode.Headless)
+            return false;
+
         if (noFocusFlag)
             return false;
 

@@ -12,6 +12,7 @@ using UnityEngine;
 namespace UniCli.Server.Editor.Handlers
 {
     [Module("Recorder")]
+    [CommandCapability(requiresGraphics: true)]
     public sealed class RecorderStartRecordingHandler : CommandHandler<RecorderStartRecordingRequest, RecorderStartRecordingResponse>
     {
         public override string CommandName => "Recorder.StartRecording";

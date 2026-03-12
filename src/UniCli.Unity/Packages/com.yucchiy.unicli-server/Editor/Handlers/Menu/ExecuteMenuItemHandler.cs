@@ -5,6 +5,7 @@ using UnityEditor;
 
 namespace UniCli.Server.Editor.Handlers
 {
+    [CommandCapability(interactiveOnly: true)]
     public sealed class ExecuteMenuItemHandler : CommandHandler<ExecuteMenuItemRequest, ExecuteMenuItemResponse>
     {
         private readonly EditorStateGuard _guard;

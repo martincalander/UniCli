@@ -7,6 +7,7 @@ using UnityEngine;
 
 namespace UniCli.Server.Editor.Handlers
 {
+    [CommandCapability(requiresGraphics: true)]
     public sealed class ScreenshotCaptureHandler : CommandHandler<ScreenshotCaptureRequest, ScreenshotCaptureResponse>
     {
         public override string CommandName => "Screenshot.Capture";

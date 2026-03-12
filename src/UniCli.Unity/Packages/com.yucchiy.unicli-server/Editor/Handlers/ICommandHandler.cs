@@ -36,6 +36,7 @@ namespace UniCli.Server.Editor.Handlers
         {
             var handlerType = GetType();
             var assemblyName = handlerType.Assembly.GetName().Name;
+            var capabilities = CommandCapabilityAttribute.Resolve(handlerType);
             var requestMetadata = CommandFieldInfoExtractor.Extract(typeof(TRequest));
             var responseMetadata = CommandFieldInfoExtractor.Extract(typeof(TResponse));
             return new CommandInfo
@@ -44,6 +45,8 @@ namespace UniCli.Server.Editor.Handlers
                 description = Description,
                 builtIn = assemblyName.StartsWith("UniCli.Server.Editor"),
                 module = ModuleRegistry.ResolveModuleName(handlerType),
+                interactiveOnly = capabilities.InteractiveOnly,
+                requiresGraphics = capabilities.RequiresGraphics,
                 requestFields = requestMetadata.Fields,
                 responseFields = responseMetadata.Fields,
                 requestTypeDetails = requestMetadata.TypeDetails,

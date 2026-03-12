@@ -5,6 +5,7 @@ using NUnit.Framework;
 using UniCli.Protocol;
 using UniCli.Server.Editor.Handlers;
 using UnityEditor;
+using UnityEngine.Rendering;
 
 namespace UniCli.Server.Editor.Tests
 {
@@ -36,6 +37,18 @@ namespace UniCli.Server.Editor.Tests
             {
                 writer.WriteLine($"formatted:{((TestResponse)response).value}");
                 return true;
+            }
+        }
+
+        [CommandCapability(interactiveOnly: true, requiresGraphics: true)]
+        private sealed class CapabilityHandler : CommandHandler<Unit, Unit>
+        {
+            public override string CommandName => "Test.Capability";
+            public override string Description => "Capability metadata handler";
+
+            protected override ValueTask<Unit> ExecuteAsync(Unit request, CancellationToken cancellationToken)
+            {
+                return new ValueTask<Unit>(Unit.Value);
             }
         }
 
@@ -253,6 +266,71 @@ namespace UniCli.Server.Editor.Tests
             StringAssert.Contains("\"typeName\":\"Duplicate\",\"typeId\":\"Tests:Beta.Duplicate\"", response.data);
             StringAssert.Contains("\"name\":\"alpha\",\"type\":\"Duplicate\",\"typeId\":\"Tests:Alpha.Duplicate\"", response.data);
             StringAssert.Contains("\"name\":\"beta\",\"type\":\"Duplicate\",\"typeId\":\"Tests:Beta.Duplicate\"", response.data);
+        }
+
+        [Test]
+        public void GetCommandInfo_IncludesCapabilityFlags()
+        {
+            var handler = new CapabilityHandler();
+
+            var info = handler.GetCommandInfo();
+
+            Assert.IsTrue(info.interactiveOnly);
+            Assert.IsTrue(info.requiresGraphics);
+        }
+
+        [Test]
+        public void BuildResponse_CommandListResponse_SerializesCapabilityFlags()
+        {
+            var dispatcher = new CommandDispatcher(CreateServiceRegistry());
+            var handler = new StubHandler();
+            var data = new CommandListResponse
+            {
+                commands = new[] { new CapabilityHandler().GetCommandInfo() }
+            };
+
+            var response = dispatcher.BuildResponse(true, "ok", data, handler, false);
+
+            StringAssert.Contains("\"interactiveOnly\":true", response.data);
+            StringAssert.Contains("\"requiresGraphics\":true", response.data);
+        }
+
+        [Test]
+        public void GetCapabilityError_InteractiveOnlyCommandInBatchMode_ReturnsMessage()
+        {
+            var message = CommandDispatcher.GetCapabilityError(
+                new CommandCapabilityInfo { InteractiveOnly = true },
+                isBatchMode: true,
+                graphicsDeviceType: GraphicsDeviceType.Metal,
+                commandName: "Window.Open");
+
+            StringAssert.Contains("requires an interactive Unity Editor session", message);
+            StringAssert.Contains("--headless", message);
+        }
+
+        [Test]
+        public void GetCapabilityError_GraphicsCommandWithoutGraphics_ReturnsMessage()
+        {
+            var message = CommandDispatcher.GetCapabilityError(
+                new CommandCapabilityInfo { RequiresGraphics = true },
+                isBatchMode: true,
+                graphicsDeviceType: GraphicsDeviceType.Null,
+                commandName: "Screenshot.Capture");
+
+            StringAssert.Contains("requires graphics", message);
+            StringAssert.Contains("--no-graphics", message);
+        }
+
+        [Test]
+        public void GetCapabilityError_UnannotatedCommand_ReturnsNull()
+        {
+            var message = CommandDispatcher.GetCapabilityError(
+                default,
+                isBatchMode: false,
+                graphicsDeviceType: GraphicsDeviceType.Metal,
+                commandName: "Compile");
+
+            Assert.IsNull(message);
         }
 
         private static CommandTypeDetail[] CreateTypeDetailChain(int depth)

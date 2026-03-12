@@ -11,7 +11,11 @@ public class CreateStartInfoTests
         var editorPath = "/Applications/Unity/Hub/Editor/6000.0.0f1/Unity.app/Contents/MacOS/Unity";
         var projectRoot = "/tmp/MyProject";
 
-        var startInfo = UnityLauncher.CreateStartInfo(editorPath, projectRoot, isMacOS: true);
+        var startInfo = UnityLauncher.CreateStartInfo(
+            editorPath,
+            projectRoot,
+            isMacOS: true,
+            UnityLaunchOptions.DefaultInteractive);
 
         Assert.Equal("open", startInfo.FileName);
         Assert.False(startInfo.UseShellExecute);
@@ -26,13 +30,51 @@ public class CreateStartInfoTests
         var editorPath = @"C:\Program Files\Unity\Hub\Editor\6000.0.0f1\Editor\Unity.exe";
         var projectRoot = @"C:\work\MyProject";
 
-        var startInfo = UnityLauncher.CreateStartInfo(editorPath, projectRoot, isMacOS: false);
+        var startInfo = UnityLauncher.CreateStartInfo(
+            editorPath,
+            projectRoot,
+            isMacOS: false,
+            UnityLaunchOptions.DefaultInteractive);
 
         Assert.Equal(editorPath, startInfo.FileName);
         Assert.True(startInfo.UseShellExecute);
         Assert.False(startInfo.RedirectStandardOutput);
         Assert.False(startInfo.RedirectStandardError);
         Assert.Equal(["-projectPath", projectRoot], startInfo.ArgumentList);
+    }
+
+    [Fact]
+    public void Headless_UsesUnityBinaryWithBatchmodeAndDedicatedLogFile()
+    {
+        var editorPath = "/Applications/Unity/Hub/Editor/6000.0.0f1/Unity.app/Contents/MacOS/Unity";
+        var projectRoot = "/tmp/MyProject";
+
+        var startInfo = UnityLauncher.CreateStartInfo(
+            editorPath,
+            projectRoot,
+            isMacOS: true,
+            new UnityLaunchOptions(UnityLaunchMode.Headless, false, false));
+
+        Assert.Equal(editorPath, startInfo.FileName);
+        Assert.True(startInfo.UseShellExecute);
+        Assert.Equal(
+            ["-projectPath", projectRoot, "-batchmode", "-accept-apiupdate", "-logFile", "/tmp/MyProject/Library/UniCli/headless.log"],
+            startInfo.ArgumentList);
+    }
+
+    [Fact]
+    public void Headless_WithNoGraphics_AddsNographics()
+    {
+        var editorPath = "/Applications/Unity/Hub/Editor/6000.0.0f1/Unity.app/Contents/MacOS/Unity";
+        var projectRoot = "/tmp/MyProject";
+
+        var startInfo = UnityLauncher.CreateStartInfo(
+            editorPath,
+            projectRoot,
+            isMacOS: true,
+            new UnityLaunchOptions(UnityLaunchMode.Headless, true, false));
+
+        Assert.Contains("-nographics", startInfo.ArgumentList);
     }
 }
 

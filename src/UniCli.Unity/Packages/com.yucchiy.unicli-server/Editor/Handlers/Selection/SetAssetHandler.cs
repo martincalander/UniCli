@@ -5,6 +5,7 @@ using UnityEditor;
 
 namespace UniCli.Server.Editor.Handlers
 {
+    [CommandCapability(interactiveOnly: true)]
     public sealed class SetAssetSelectionHandler : CommandHandler<SetAssetSelectionRequest, SetAssetSelectionResponse>
     {
         public override string CommandName => "Selection.SetAsset";

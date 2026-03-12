@@ -15,28 +15,30 @@ internal sealed class Program
     {
         if (args is ["exec", var commandName, .. var remaining])
         {
-            if (remaining.Contains("--help"))
-            {
-                Environment.ExitCode = await CommandExecutor.PrintCommandHelpAsync(commandName);
-                return;
-            }
-
             var timeoutMs = ExtractTimeout(ref remaining);
             var jsonFlag = ExtractFlag(ref remaining, "--json");
             var noFocusFlag = ExtractFlag(ref remaining, "--no-focus");
-            var focusEditor = UnityProcessActivator.ShouldFocus(noFocusFlag);
+            var headlessFlag = ExtractFlag(ref remaining, "--headless");
+            var noGraphicsFlag = ExtractFlag(ref remaining, "--no-graphics");
+            var launchOptions = UnityLaunchOptions.Resolve(headlessFlag, noGraphicsFlag, noFocusFlag);
+
+            if (remaining.Contains("--help"))
+            {
+                Environment.ExitCode = await CommandExecutor.PrintCommandHelpAsync(commandName, launchOptions);
+                return;
+            }
 
             CliResult result;
             if (remaining.Any(a => a.StartsWith("--")))
             {
                 result = await CommandExecutor.ExecuteWithKeyValueAsync(
-                    commandName, remaining, timeoutMs, jsonFlag, focusEditor);
+                    commandName, remaining, timeoutMs, jsonFlag, launchOptions);
             }
             else
             {
                 var data = remaining.Length > 0 ? remaining[0] : "";
                 result = await CommandExecutor.ExecuteAsync(
-                    commandName, data, timeoutMs, jsonFlag, focusEditor);
+                    commandName, data, timeoutMs, jsonFlag, launchOptions);
             }
 
             Environment.ExitCode = OutputWriter.Write(result, jsonFlag);
@@ -59,6 +61,8 @@ internal sealed class Program
         var timeoutMs = ExtractTimeout(ref args);
         var jsonFlag = ExtractFlag(ref args, "--json");
         var noFocusFlag = ExtractFlag(ref args, "--no-focus");
+        var headlessFlag = ExtractFlag(ref args, "--headless");
+        var noGraphicsFlag = ExtractFlag(ref args, "--no-graphics");
         var declarations = ExtractValue(ref args, "--declarations");
 
         string code;
@@ -84,8 +88,8 @@ internal sealed class Program
         }
 
         var requestJson = Encoding.UTF8.GetString(buffer.WrittenSpan);
-        var focusEditor = UnityProcessActivator.ShouldFocus(noFocusFlag);
-        var result = await CommandExecutor.ExecuteAsync("Eval", requestJson, timeoutMs, jsonFlag, focusEditor);
+        var launchOptions = UnityLaunchOptions.Resolve(headlessFlag, noGraphicsFlag, noFocusFlag);
+        var result = await CommandExecutor.ExecuteAsync("Eval", requestJson, timeoutMs, jsonFlag, launchOptions);
         return OutputWriter.Write(result, jsonFlag);
     }
 

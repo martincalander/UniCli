@@ -35,7 +35,7 @@ internal static class UnityLauncher
         return File.Exists(editorPath) ? editorPath : null;
     }
 
-    public static Result<bool, string> Launch(string projectRoot)
+    public static Result<bool, string> Launch(string projectRoot, UnityLaunchOptions launchOptions)
     {
         var editorPath = FindUnityEditorPath(projectRoot);
         if (editorPath == null)
@@ -48,7 +48,7 @@ internal static class UnityLauncher
         }
 
         var normalizedRoot = NormalizeProjectRoot(projectRoot);
-        var startInfo = CreateStartInfo(editorPath, normalizedRoot, OperatingSystem.IsMacOS());
+        var startInfo = CreateStartInfo(editorPath, normalizedRoot, OperatingSystem.IsMacOS(), launchOptions);
 
         using var process = Process.Start(startInfo);
         if (process == null)
@@ -57,8 +57,15 @@ internal static class UnityLauncher
         return Result<bool, string>.Success(true);
     }
 
-    internal static ProcessStartInfo CreateStartInfo(string editorPath, string projectRoot, bool isMacOS)
+    internal static ProcessStartInfo CreateStartInfo(
+        string editorPath,
+        string projectRoot,
+        bool isMacOS,
+        UnityLaunchOptions launchOptions)
     {
+        if (launchOptions.IsHeadless)
+            return CreateHeadlessStartInfo(editorPath, projectRoot, launchOptions.NoGraphics);
+
         if (isMacOS)
         {
             var appBundlePath = TryGetMacOSAppBundlePath(editorPath);
@@ -126,6 +133,12 @@ internal static class UnityLauncher
         return Path.GetFullPath(normalized);
     }
 
+    internal static string GetHeadlessLogPath(string projectRoot)
+    {
+        var normalizedRoot = NormalizeProjectRoot(projectRoot);
+        return Path.Combine(normalizedRoot, "Library", "UniCli", "headless.log");
+    }
+
     private static ProcessStartInfo CreateMacOSOpenStartInfo(string appBundlePath, string projectRoot)
     {
         var startInfo = new ProcessStartInfo
@@ -150,6 +163,29 @@ internal static class UnityLauncher
         };
         startInfo.ArgumentList.Add("-projectPath");
         startInfo.ArgumentList.Add(projectRoot);
+        return startInfo;
+    }
+
+    private static ProcessStartInfo CreateHeadlessStartInfo(string editorPath, string projectRoot, bool noGraphics)
+    {
+        var logPath = GetHeadlessLogPath(projectRoot);
+        var logDirectory = Path.GetDirectoryName(logPath);
+        if (!string.IsNullOrEmpty(logDirectory))
+            Directory.CreateDirectory(logDirectory);
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = editorPath,
+            UseShellExecute = true,
+        };
+        startInfo.ArgumentList.Add("-projectPath");
+        startInfo.ArgumentList.Add(projectRoot);
+        startInfo.ArgumentList.Add("-batchmode");
+        startInfo.ArgumentList.Add("-accept-apiupdate");
+        if (noGraphics)
+            startInfo.ArgumentList.Add("-nographics");
+        startInfo.ArgumentList.Add("-logFile");
+        startInfo.ArgumentList.Add(logPath);
         return startInfo;
     }
 }

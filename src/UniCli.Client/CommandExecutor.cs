@@ -12,10 +12,11 @@ internal static class CommandExecutor
 {
     private const int DefaultMaxRetries = 5;
     private const int RetryDelayMs = 1000;
+    internal static readonly TimeSpan HeadlessStartupTimeout = TimeSpan.FromSeconds(120);
 
     public static async Task<Result<CommandResponse, string>> SendAsync(
         string command, string data, int timeoutMs = 0, string format = "",
-        int maxRetries = DefaultMaxRetries, bool focusEditor = false)
+        int maxRetries = DefaultMaxRetries, UnityLaunchOptions launchOptions = default)
     {
         var explicitPath = Environment.GetEnvironmentVariable("UNICLI_PROJECT");
         var unityProjectRoot = explicitPath ?? ProjectIdentifier.FindUnityProjectRoot();
@@ -37,7 +38,8 @@ internal static class CommandExecutor
 
         string lastError = "";
         long focusSavedState = 0;
-        for (var attempt = 1; attempt <= maxRetries; attempt++)
+        DateTimeOffset? headlessLaunchStartedAt = null;
+        for (var attempt = 1; ; attempt++)
         {
             using var client = new PipeClient(pipeName);
 
@@ -46,24 +48,38 @@ internal static class CommandExecutor
             {
                 lastError = connectResult.ErrorValue;
 
+                if (ShouldContinueWaitingForHeadlessStartup(headlessLaunchStartedAt, DateTimeOffset.UtcNow))
+                {
+                    Console.Error.WriteLine($"Waiting for headless server... (attempt {attempt})");
+                    await Task.Delay(RetryDelayMs);
+                    continue;
+                }
+
                 if (!UnityProcessActivator.IsUnityRunning(unityProjectRoot))
                 {
                     Console.Error.WriteLine("Unity is not running, launching...");
-                    var launchResult = UnityLauncher.Launch(unityProjectRoot);
+                    var launchResult = UnityLauncher.Launch(unityProjectRoot, launchOptions);
                     if (launchResult.IsError)
                     {
-                        await RestoreFocusAsync(focusSavedState);
+                        await RestoreFocusAsync(launchOptions, focusSavedState);
                         return Result<CommandResponse, string>.Error(
                             $"Failed to launch Unity Editor: {launchResult.ErrorValue}");
                     }
 
-                    await RestoreFocusAsync(focusSavedState);
-                    return Result<CommandResponse, string>.Error(
-                        BuildLaunchStartedMessage(unityProjectRoot));
+                    if (launchOptions.IsHeadless)
+                    {
+                        headlessLaunchStartedAt = DateTimeOffset.UtcNow;
+                        Console.Error.WriteLine($"Waiting for headless server... (attempt {attempt})");
+                        await Task.Delay(RetryDelayMs);
+                        continue;
+                    }
+
+                    await RestoreFocusAsync(launchOptions, focusSavedState);
+                    return Result<CommandResponse, string>.Error(BuildLaunchStartedMessage(unityProjectRoot));
                 }
 
                 focusSavedState = await TryFocusOnceAsync(
-                    focusEditor, focusSavedState, unityProjectRoot);
+                    launchOptions, focusSavedState, unityProjectRoot);
 
                 if (attempt < maxRetries)
                 {
@@ -77,19 +93,26 @@ internal static class CommandExecutor
             var result = await client.SendCommandAsync(request, timeoutMs);
             if (result.IsSuccess)
             {
-                await RestoreFocusAsync(focusSavedState);
+                await RestoreFocusAsync(launchOptions, focusSavedState);
                 return result;
             }
 
             if (!IsRetryableError(result.ErrorValue))
             {
-                await RestoreFocusAsync(focusSavedState);
+                await RestoreFocusAsync(launchOptions, focusSavedState);
                 return result;
             }
 
             lastError = result.ErrorValue;
             focusSavedState = await TryFocusOnceAsync(
-                focusEditor, focusSavedState, unityProjectRoot);
+                launchOptions, focusSavedState, unityProjectRoot);
+
+            if (ShouldContinueWaitingForHeadlessStartup(headlessLaunchStartedAt, DateTimeOffset.UtcNow))
+            {
+                Console.Error.WriteLine($"Server disconnected, retrying... (attempt {attempt})");
+                await Task.Delay(RetryDelayMs);
+                continue;
+            }
 
             if (attempt < maxRetries)
             {
@@ -97,9 +120,15 @@ internal static class CommandExecutor
                     $"Server disconnected, retrying... (attempt {attempt}/{maxRetries})");
                 await Task.Delay(RetryDelayMs);
             }
+
+            break;
         }
 
-        await RestoreFocusAsync(focusSavedState);
+        await RestoreFocusAsync(launchOptions, focusSavedState);
+        if (headlessLaunchStartedAt.HasValue)
+            return Result<CommandResponse, string>.Error(
+                BuildHeadlessStartupTimeoutMessage(unityProjectRoot, pipeName, lastError));
+
         return Result<CommandResponse, string>.Error(
             $"Failed to communicate with Unity Editor server after {maxRetries} attempts.\n"
             + $"  Project: {unityProjectRoot}\n"
@@ -120,10 +149,31 @@ internal static class CommandExecutor
             + "  Wait for Unity Editor to finish loading, then run the command again.";
     }
 
-    private static async Task<long> TryFocusOnceAsync(
-        bool focusEditor, long savedState, string projectRoot)
+    internal static string BuildHeadlessStartupTimeoutMessage(string projectRoot, string pipeName, string lastError)
     {
-        if (!focusEditor || savedState != 0)
+        var normalizedProjectRoot = UnityLauncher.NormalizeProjectRoot(projectRoot);
+        var logPath = UnityLauncher.GetHeadlessLogPath(normalizedProjectRoot);
+        return $"Headless Unity did not start the UniCli server within {HeadlessStartupTimeout.TotalSeconds:F0} seconds.\n"
+            + $"  Project: {normalizedProjectRoot}\n"
+            + $"  Pipe: {pipeName}\n"
+            + $"  Log: {logPath}\n"
+            + $"  Last error: {lastError}";
+    }
+
+    internal static bool ShouldContinueWaitingForHeadlessStartup(
+        DateTimeOffset? headlessLaunchStartedAt,
+        DateTimeOffset now)
+    {
+        if (!headlessLaunchStartedAt.HasValue)
+            return false;
+
+        return now - headlessLaunchStartedAt.Value < HeadlessStartupTimeout;
+    }
+
+    private static async Task<long> TryFocusOnceAsync(
+        UnityLaunchOptions launchOptions, long savedState, string projectRoot)
+    {
+        if (!launchOptions.FocusAllowed || savedState != 0)
             return savedState;
 
         var pid = UnityProcessActivator.ReadPidFile(projectRoot);
@@ -134,15 +184,15 @@ internal static class CommandExecutor
         return await UnityProcessActivator.TryActivateAsync(projectRoot);
     }
 
-    private static async Task RestoreFocusAsync(long savedState)
+    private static async Task RestoreFocusAsync(UnityLaunchOptions launchOptions, long savedState)
     {
-        if (savedState != 0)
+        if (launchOptions.FocusAllowed && savedState != 0)
             await UnityProcessActivator.TryRestoreFocusAsync(savedState);
     }
 
-    public static async Task<int> PrintCommandHelpAsync(string commandName)
+    public static async Task<int> PrintCommandHelpAsync(string commandName, UnityLaunchOptions launchOptions = default)
     {
-        var result = await SendAsync("Commands.List", "");
+        var result = await SendAsync("Commands.List", "", launchOptions: launchOptions);
 
         return result.Match(
             onSuccess: response =>
@@ -242,9 +292,9 @@ internal static class CommandExecutor
 
     public static async Task<CliResult> ExecuteWithKeyValueAsync(
         string commandName, string[] args, int timeoutMs = 0, bool json = false,
-        bool focusEditor = true)
+        UnityLaunchOptions launchOptions = default)
     {
-        var listResult = await SendAsync("Commands.List", "");
+        var listResult = await SendAsync("Commands.List", "", launchOptions: launchOptions);
         if (listResult.IsError)
             return CliResult.Error(listResult.ErrorValue);
 
@@ -271,15 +321,15 @@ internal static class CommandExecutor
         }
 
         var jsonData = ArgumentParser.BuildJsonFromKeyValues(pairs, fields);
-        return await ExecuteAsync(commandName, jsonData, timeoutMs, json, focusEditor);
+        return await ExecuteAsync(commandName, jsonData, timeoutMs, json, launchOptions);
     }
 
     public static async Task<CliResult> ExecuteAsync(
         string command, string data, int timeoutMs = 0, bool json = false,
-        bool focusEditor = true)
+        UnityLaunchOptions launchOptions = default)
     {
         var format = json ? "json" : "text";
-        var result = await SendAsync(command, data, timeoutMs, format, focusEditor: focusEditor);
+        var result = await SendAsync(command, data, timeoutMs, format, launchOptions: launchOptions);
 
         return result.Match(
             onSuccess: response =>

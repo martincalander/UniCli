@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,6 +9,7 @@ using UniCli.Protocol;
 using UniCli.Server.Editor.Handlers;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace UniCli.Server.Editor
 {
@@ -90,6 +92,15 @@ namespace UniCli.Server.Editor
             if (versionCheck.IsError)
                 return MakeResponse(false, versionCheck.Message);
 
+            var handlerCapabilities = CommandCapabilityAttribute.Resolve(handler.GetType());
+            var capabilityError = GetCapabilityError(
+                handlerCapabilities,
+                Application.isBatchMode,
+                SystemInfo.graphicsDeviceType,
+                request.command);
+            if (capabilityError != null)
+                return MakeResponse(false, capabilityError);
+
             var wantsText = request.format == "text";
 
             try
@@ -143,6 +154,25 @@ namespace UniCli.Server.Editor
                     "");
 
             return default;
+        }
+
+        internal static string? GetCapabilityError(
+            CommandCapabilityInfo capabilities,
+            bool isBatchMode,
+            GraphicsDeviceType graphicsDeviceType,
+            string commandName)
+        {
+            if (capabilities.InteractiveOnly && isBatchMode)
+            {
+                return $"Command '{commandName}' requires an interactive Unity Editor session. Re-run without --headless or unset UNICLI_MODE=headless.";
+            }
+
+            if (capabilities.RequiresGraphics && graphicsDeviceType == GraphicsDeviceType.Null)
+            {
+                return $"Command '{commandName}' requires graphics. Re-run without --no-graphics.";
+            }
+
+            return null;
         }
 
         internal CommandResponse BuildResponse(bool success, string message, object data, ICommandHandler handler, bool wantsText)

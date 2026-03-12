@@ -7,6 +7,7 @@ using UnityEngine;
 
 namespace UniCli.Server.Editor.Handlers
 {
+    [CommandCapability(interactiveOnly: true)]
     public sealed class SetGameObjectsSelectionHandler : CommandHandler<SetGameObjectsSelectionRequest, SetGameObjectsSelectionResponse>
     {
         public override string CommandName => "Selection.SetGameObjects";

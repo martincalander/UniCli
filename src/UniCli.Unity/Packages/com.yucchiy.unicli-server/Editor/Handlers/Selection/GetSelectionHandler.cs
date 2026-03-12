@@ -8,6 +8,7 @@ using UnityEngine;
 
 namespace UniCli.Server.Editor.Handlers
 {
+    [CommandCapability(interactiveOnly: true)]
     public sealed class GetSelectionHandler : CommandHandler<Unit, GetSelectionResponse>
     {
         public override string CommandName => "Selection.Get";

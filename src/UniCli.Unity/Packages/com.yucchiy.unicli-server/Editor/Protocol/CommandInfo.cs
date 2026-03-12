@@ -9,6 +9,8 @@ namespace UniCli.Protocol
         public string description;
         public bool builtIn;
         public string module;
+        public bool interactiveOnly;
+        public bool requiresGraphics;
         public CommandFieldInfo[] requestFields;
         public CommandFieldInfo[] responseFields;
         public CommandTypeDetail[] requestTypeDetails;

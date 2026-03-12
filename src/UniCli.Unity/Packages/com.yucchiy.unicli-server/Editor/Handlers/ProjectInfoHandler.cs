@@ -27,6 +27,7 @@ namespace UniCli.Server.Editor.Handlers
             writer.WriteLine($"Company:   {response.companyName}");
             writer.WriteLine($"Path:      {response.projectPath}");
             writer.WriteLine($"Target:    {response.buildTarget}");
+            writer.WriteLine($"Mode:      {(response.isBatchMode ? "Headless" : "Interactive")}");
             writer.WriteLine($"Playing:   {(response.isPlaying ? "Yes" : "No")}");
             writer.WriteLine($"PID:       {response.processId}");
             writer.WriteLine($"Server ID: {response.serverId}");
@@ -48,6 +49,7 @@ namespace UniCli.Server.Editor.Handlers
                 productName = PlayerSettings.productName,
                 companyName = PlayerSettings.companyName,
                 buildTarget = EditorUserBuildSettings.activeBuildTarget.ToString(),
+                isBatchMode = Application.isBatchMode,
                 isPlaying = EditorApplication.isPlaying,
                 processId = Process.GetCurrentProcess().Id,
                 serverId = _context.ServerId,
@@ -68,6 +70,7 @@ namespace UniCli.Server.Editor.Handlers
         public string productName;
         public string companyName;
         public string buildTarget;
+        public bool isBatchMode;
         public bool isPlaying;
         public int processId;
         public string serverId;

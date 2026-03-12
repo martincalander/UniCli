@@ -6,6 +6,7 @@ using UnityEngine;
 
 namespace UniCli.Server.Editor.Handlers
 {
+    [CommandCapability(interactiveOnly: true)]
     public sealed class FocusWindowHandler : CommandHandler<FocusWindowRequest, FocusWindowResponse>
     {
         public override string CommandName => "Window.Focus";

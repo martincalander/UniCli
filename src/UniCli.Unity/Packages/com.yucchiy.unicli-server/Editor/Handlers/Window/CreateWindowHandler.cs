@@ -6,6 +6,7 @@ using UnityEngine;
 
 namespace UniCli.Server.Editor.Handlers
 {
+    [CommandCapability(interactiveOnly: true)]
     public sealed class CreateWindowHandler : CommandHandler<CreateWindowRequest, CreateWindowResponse>
     {
         public override string CommandName => "Window.Create";

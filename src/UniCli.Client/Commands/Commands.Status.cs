@@ -37,7 +37,7 @@ public partial class Commands
                     ? "Server is not responding (Unity is running, may be reloading assemblies)"
                     : "Server is not running";
                 var result = BuildStatusResult(false, projectRoot, pipeName, error, 0,
-                    new ServerInfo(pid, null, null, 0));
+                    new ServerInfo(pid, null, null, 0, null));
                 return OutputWriter.Write(result, json);
             }
 
@@ -81,7 +81,8 @@ public partial class Commands
         int ProcessId,
         string? ServerId,
         string? StartedAt,
-        double UptimeSeconds);
+        double UptimeSeconds,
+        bool? IsBatchMode);
 
     private static async Task<ServerInfo> GetServerInfoAsync(string pipeName)
     {
@@ -117,8 +118,9 @@ public partial class Commands
             var serverId = root.TryGetProperty("serverId", out var sidEl) ? sidEl.GetString() : null;
             var startedAt = root.TryGetProperty("startedAt", out var saEl) ? saEl.GetString() : null;
             var uptime = root.TryGetProperty("uptimeSeconds", out var utEl) ? utEl.GetDouble() : 0;
+            var isBatchMode = root.TryGetProperty("isBatchMode", out var ibmEl) ? ibmEl.GetBoolean() : (bool?)null;
 
-            return new ServerInfo(processId, serverId, startedAt, uptime);
+            return new ServerInfo(processId, serverId, startedAt, uptime, isBatchMode);
         }
         catch
         {
@@ -158,6 +160,8 @@ public partial class Commands
             sb.AppendLine($"Server:    running ({commandCount} commands available)");
             if (serverInfo.ProcessId > 0)
                 sb.AppendLine($"PID:       {serverInfo.ProcessId}");
+            if (serverInfo.IsBatchMode.HasValue)
+                sb.AppendLine($"Mode:      {(serverInfo.IsBatchMode.Value ? "Headless" : "Interactive")}");
             if (serverInfo.ServerId != null)
                 sb.AppendLine($"Server ID: {serverInfo.ServerId}");
             if (serverInfo.StartedAt != null)
@@ -201,6 +205,8 @@ public partial class Commands
             writer.WriteNumber("commandCount", commandCount);
             if (serverInfo.ProcessId > 0)
                 writer.WriteNumber("processId", serverInfo.ProcessId);
+            if (serverInfo.IsBatchMode.HasValue)
+                writer.WriteBoolean("isBatchMode", serverInfo.IsBatchMode.Value);
             if (serverInfo.ServerId != null)
                 writer.WriteString("serverId", serverInfo.ServerId);
             if (serverInfo.StartedAt != null)

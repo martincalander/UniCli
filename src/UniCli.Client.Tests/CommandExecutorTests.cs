@@ -60,3 +60,43 @@ public class FormatTypeDetailHeadingTests
         Assert.Equal("Duplicate (Tests:Alpha.Duplicate)", result);
     }
 }
+
+public class HeadlessStartupTests
+{
+    [Fact]
+    public void TimeoutMessage_IncludesLogPathAndLastError()
+    {
+        var result = CommandExecutor.BuildHeadlessStartupTimeoutMessage(
+            "src/UniCli.Unity",
+            "unicli-testpipe",
+            "Connection timeout");
+
+        Assert.Contains(Path.GetFullPath("src/UniCli.Unity"), result);
+        Assert.Contains("Library/UniCli/headless.log", result);
+        Assert.Contains("Connection timeout", result);
+    }
+
+    [Fact]
+    public void ContinueWaiting_WhenWithinBudget()
+    {
+        var start = DateTimeOffset.UtcNow;
+
+        var result = CommandExecutor.ShouldContinueWaitingForHeadlessStartup(
+            start,
+            start.AddSeconds(30));
+
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void StopWaiting_WhenBudgetExpires()
+    {
+        var start = DateTimeOffset.UtcNow;
+
+        var result = CommandExecutor.ShouldContinueWaitingForHeadlessStartup(
+            start,
+            start.Add(CommandExecutor.HeadlessStartupTimeout).AddSeconds(1));
+
+        Assert.False(result);
+    }
+}
